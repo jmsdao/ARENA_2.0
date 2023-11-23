@@ -659,6 +659,7 @@ def invert_transposition(axes: tuple) -> tuple:
     tmap = {j: i for i, j in enumerate(axes)}
     return tuple(tmap[i] for i in range(len(axes)))
 
+
 def permute_back(grad_out: Arr, out: Arr, x: Arr, axes: tuple) -> Arr:
     return np.transpose(grad_out, invert_transposition(axes))
 
@@ -671,3 +672,49 @@ if MAIN:
 
 
 # %%
+def expand_back(grad_out: Arr, out: Arr, x: Arr, new_shape: tuple) -> Arr:
+    return unbroadcast(grad_out, x)
+
+
+def _expand(x: Arr, new_shape) -> Arr:
+    '''
+    Like torch.expand, calling np.broadcast_to internally.
+
+    Note torch.expand supports -1 for a dimension size meaning "don't change the size".
+    np.broadcast_to does not natively support this.
+    '''
+    dim_diff = len(new_shape) - len(x.shape)
+    out_shape = list(new_shape[0:dim_diff])
+    for od, nd in zip(x.shape, new_shape[dim_diff:]):
+        size = od if nd == -1 else nd
+        out_shape.append(size)
+
+    return np.broadcast_to(x, out_shape)
+
+
+if MAIN:
+    expand = wrap_forward_fn(_expand)
+    BACK_FUNCS.add_back_func(_expand, 0, expand_back)
+
+    tests.test_expand(Tensor)
+    tests.test_expand_negative_length(Tensor)
+
+
+# %%
+def sum_back(grad_out: Arr, out: Arr, x: Arr, dim=None, keepdim=False):
+    '''Basic idea: repeat grad_out over the dims along which x was summed'''
+    pass
+
+
+def _sum(x: Arr, dim=None, keepdim=False) -> Arr:
+    '''Like torch.sum, calling np.sum internally.'''
+    return np.sum(x, axis=dim, keepdims=keepdim)
+
+
+if MAIN:
+    sum = wrap_forward_fn(_sum)
+    BACK_FUNCS.add_back_func(_sum, 0, sum_back)
+
+    tests.test_sum_keepdim_false(Tensor)
+    tests.test_sum_keepdim_true(Tensor)
+    tests.test_sum_dim_none(Tensor)
