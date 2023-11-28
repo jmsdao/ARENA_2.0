@@ -703,7 +703,20 @@ if MAIN:
 # %%
 def sum_back(grad_out: Arr, out: Arr, x: Arr, dim=None, keepdim=False):
     '''Basic idea: repeat grad_out over the dims along which x was summed'''
-    pass
+    # If grad_out is a scalar, we need to make it a tensor (so we can expand it later)
+    if not isinstance(grad_out, Arr):
+        grad_out = np.array(grad_out)
+
+    # If dim=None, this means we summed over all axes, and we want to repeat back to input shape
+    if dim is None:
+        dim = list(range(x.ndim))
+
+    # If keepdim=False, then we need to add back in dims, so grad_out and x have same number of dims
+    if not keepdim:
+        grad_out = np.expand_dims(grad_out, dim)
+
+    # Finally, we repeat grad_out along the dims over which x was summed
+    return np.broadcast_to(grad_out, x.shape)
 
 
 def _sum(x: Arr, dim=None, keepdim=False) -> Arr:
